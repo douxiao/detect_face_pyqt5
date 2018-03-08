@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-#-*-coding:utf-8-*-
+# -*-coding:utf-8-*-
 # @Time    : 18-3-6 下午7:01
 # @Author  : sunshine.dxiao
 # @FileName: recognition_face.py
@@ -14,7 +14,8 @@ from PyQt5.QtWidgets import *
 from PyQt5.QtCore import *
 from PyQt5.QtGui import *
 from skimage import io
-from datetime import  datetime
+from datetime import datetime
+import threading
 
 
 class MainWindow(QWidget):
@@ -27,18 +28,20 @@ class MainWindow(QWidget):
         self.slot_init()  # 初始化信号槽
         self.dlib_para_init()
         self.btn_flag = 0  # 开关变量
+        self.local_data = []
+
     def set_ui(self):
         # 布局设置
-        self.layout_main   = QHBoxLayout()  # 整体框架是水平布局
+        self.layout_main = QHBoxLayout()  # 整体框架是水平布局
         self.layout_button = QVBoxLayout()
 
         # 按钮设置
-        self.btn_open_cam          = QPushButton('打开相机')
-        self.btn_photo             = QPushButton('拍照')
-        self.btn_detection_face    = QPushButton('人脸检测')
-        self.btn_recognition_face  = QPushButton('人脸识别')
+        self.btn_open_cam = QPushButton('打开相机')
+        self.btn_photo = QPushButton('拍照')
+        self.btn_detection_face = QPushButton('人脸检测')
+        self.btn_recognition_face = QPushButton('人脸识别')
 
-        self.btn_quit              = QPushButton('退出')
+        self.btn_quit = QPushButton('退出')
 
         # 显示视频
         self.label_show_camera = QLabel()
@@ -62,7 +65,6 @@ class MainWindow(QWidget):
         self.setLayout(self.layout_main)
         self.setGeometry(300, 300, 600, 400)
         self.setWindowTitle("视频图像处理软件")
-
 
     # 信号槽设置
     def slot_init(self):
@@ -118,46 +120,53 @@ class MainWindow(QWidget):
 
             ret_2, self.image_2 = self.cap.read()
             show_2 = cv2.resize(self.image_2, (640, 480))
-            show_3 = cv2.cvtColor(show_2, cv2.COLOR_BGR2RGB)
+            self.show_3 = cv2.cvtColor(show_2, cv2.COLOR_BGR2RGB)
             gray_image = cv2.cvtColor(show_2, cv2.COLOR_BGR2GRAY)
-            dets = self.detector(gray_image, 1)  # 对视频中的人脸进行标定
-            dist = []  # 声明一个数组
-            if not len(dets):
+            self.dets = self.detector(gray_image, 1)  # 对视频中的人脸进行标定
+            self.dist = []  # 声明一个数组
+            if not len(self.dets):
                 # print('Can`t get face.')
-                detect_image = QImage(show_3.data, show_3.shape[1], show_3.shape[0],
+                detect_image = QImage(self.show_3.data, self.show_3.shape[1], self.show_3.shape[0],
                                       QImage.Format_RGB888)
                 self.label_show_camera.setPixmap(QPixmap.fromImage(detect_image))
+            # 这里开启了一个人脸识别的线程，会自动为for循环分配线程，这里为进一步在同一个视频中，识别不同的人脸准备
+            t = threading.Thread(target=self.face_thread, name='Face_Thread')
+            t.start()
+            t.join()
 
-            for k, face in enumerate(dets):   # 遍历视频中所有人脸 ，
+    def face_thread(self):  # 这里多线程是解决，同时识别不同人脸的关键
 
-                shape = self.landmark(show_3, face)  # 检测人脸特征点
-                face_descriptor = self.facerec.compute_face_descriptor(show_3, shape)  # 计算人脸的128D向量
-                d_test = np.array(face_descriptor)
-                x1 = face.top() if face.top() > 0 else 0
-                y1 = face.bottom() if face.bottom() > 0 else 0
-                x2 = face.left() if face.left() > 0 else 0
-                y2 = face.right() if face.right() > 0 else 0
-                cv2.rectangle(show_3, (x2, x1), (y2, y1), (255, 0, 0), 3)
-                # 计算欧式距离
-                for i in self.descriptors:  # 遍历之前提取的候选人的128D向量
-                    dist_ = np.linalg.norm(i - d_test)  # 计算欧式距离，有多少个候选人就有多少个距离,放到dist数组中。
-                    dist.append(dist_)
-                    # 候选人和距离组成一个dict字典
-                c_d = dict(zip(self.candidate, dist))
-                # sorted将dict字典中数排序，按key顺序（第二个关键字）
-                cd_sorted = sorted(c_d.items(), key=lambda d: d[1])
-                #for num in range(0, k):
-                cv2.putText(show_3, cd_sorted[0][0], (x2, x1), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 255, 255), 2)
+        print('thread %s is running...' % threading.current_thread().name)
+        for k, face in enumerate(self.dets):  # 遍历视频中所有人脸 ，
 
-                     # 各参数依次是：照片/添加的文字/左上角坐标/字体/字体大小/颜色/字体粗细
-                print("\n The person is: ", cd_sorted[0][0])
-                detect_image = QImage(show_3.data, show_3.shape[1], show_3.shape[0],
+            print('thread %s >>> %s' % (threading.current_thread().name, k))
+            shape = self.landmark(self.show_3, face)  # 检测人脸特征点
+            face_descriptor = self.facerec.compute_face_descriptor(self.show_3, shape)  # 计算人脸的128D向量
+            d_test = np.array(face_descriptor)
+            x1 = face.top() if face.top() > 0 else 0
+            y1 = face.bottom() if face.bottom() > 0 else 0
+            x2 = face.left() if face.left() > 0 else 0
+            y2 = face.right() if face.right() > 0 else 0
+            cv2.rectangle(self.show_3, (x2, x1), (y2, y1), (255, 0, 0), 3)
+            # print(x2, x1, y2, y1)
+            # 计算欧式距离
+            for i in self.descriptors:  # 遍历之前提取的候选人的128D向量
+                dist_ = np.linalg.norm(i - d_test)  # 计算欧式距离，有多少个候选人就有多少个距离,放到dist数组中。
+                self.dist.append(dist_)
+                # 候选人和距离组成一个dict字典
+            # print(self.dist)
+            c_d = dict(zip(self.candidate, self.dist))
+            for i in range(0, len(self.candidate)):  # 注意这里必须把dist[]之前的数据pop出去，才能确保每次不同线程计算的不同人的向量。
+                self.dist.pop()
+            # sorted将dict字典中数排序，按key顺序（第二个关键字）
+            cd_sorted = sorted(c_d.items(), key=lambda d: d[1])
+            cv2.putText(self.show_3, cd_sorted[0][0], (x2, x1), cv2.FONT_HERSHEY_SIMPLEX, 1.0,
+                        (0, 255, 255), 2)
+            # 各参数依次是：照片/添加的文字/左上角坐标/字体/字体大小/颜色/字体粗细
+            print("\n The person is: ", cd_sorted[0][0])
+            detect_image = QImage(self.show_3.data, self.show_3.shape[1], self.show_3.shape[0],
                                   QImage.Format_RGB888)
-                self.label_show_camera.setPixmap(QPixmap.fromImage(detect_image))
-
-
-
-
+            self.label_show_camera.setPixmap(QPixmap.fromImage(detect_image))
 
     def detect_face(self):
 
@@ -168,7 +177,6 @@ class MainWindow(QWidget):
             self.btn_flag = 0
             self.btn_detection_face.setText(u'人脸检测')
 
-
     def recognize_face(self):
 
         if self.btn_flag == 0:
@@ -178,19 +186,13 @@ class MainWindow(QWidget):
             self.btn_flag = 0
             self.btn_recognition_face.setText(u'人脸识别')
 
-
     def photo_face(self):
 
-
-
-     #   photo_save_path = '/home/dx/Desktop/detect_face_pyqt5/candidate-faces'
+        #   photo_save_path = '/home/dx/Desktop/detect_face_pyqt5/candidate-faces'
 
         photo_save_path = os.path.join(os.path.dirname(os.path.abspath('__file__')),
                                        'candidate-faces/')
-        self.showImage.save(photo_save_path + datetime.now().strftime("%Y%m%d_%H%M%S")+".jpg")
-
-
-
+        self.showImage.save(photo_save_path + datetime.now().strftime("%Y%m%d_%H%M%S") + ".jpg")
 
     def closeEvent(self, QCloseEvent):
 
@@ -207,19 +209,19 @@ class MainWindow(QWidget):
     def dlib_para_init(self):
 
         # 人脸关键点检测器
-      #  face_landmark_path    = '/home/dx/Desktop/detect_face_pyqt5/shape_predictor_68_face_landmarks.dat'
-        face_landmark_path    =  os.path.join(os.path.dirname(os.path.abspath('__file__')),
-                                              'shape_predictor_68_face_landmarks.dat')
+        #  face_landmark_path    = '/home/dx/Desktop/detect_face_pyqt5/shape_predictor_68_face_landmarks.dat'
+        face_landmark_path = os.path.join(os.path.dirname(os.path.abspath('__file__')),
+                                          'shape_predictor_68_face_landmarks.dat')
 
         # 人脸识别模型
-      #  face_recognize_path   = '/home/dx/Desktop/detect_face_pyqt5/dlib_face_recognition_resnet_model_v1.dat'
-        face_recognize_path   = os.path.join(os.path.dirname(os.path.abspath('__file__')),
-                                             'dlib_face_recognition_resnet_model_v1.dat')
+        #  face_recognize_path   = '/home/dx/Desktop/detect_face_pyqt5/dlib_face_recognition_resnet_model_v1.dat'
+        face_recognize_path = os.path.join(os.path.dirname(os.path.abspath('__file__')),
+                                           'dlib_face_recognition_resnet_model_v1.dat')
 
         # 候选人文件夹
-      #  faces_folder_path     = '/home/dx/Desktop/detect_face_pyqt5/candidate-faces'
-        faces_folder_path     = os.path.join(os.path.dirname(os.path.abspath('__file__')),
-                                             'candidate-faces')
+        #  faces_folder_path     = '/home/dx/Desktop/detect_face_pyqt5/candidate-faces'
+        faces_folder_path = os.path.join(os.path.dirname(os.path.abspath('__file__')),
+                                         'candidate-faces')
         # 1.加载正脸检测器
         self.detector = dlib.get_frontal_face_detector()
         # 2.加载人脸关键点检测器
@@ -267,11 +269,7 @@ class MainWindow(QWidget):
 
         # 候选人名单
 
-        self.candidate = ['dwh', 'whr', 'zjr', 'dx']
-
-
-
-
+        self.candidate = ['dwh', 'whr', 'zjr', 'whr', 'dx', 'dx']
 
 
 if __name__ == '__main__':
@@ -279,4 +277,3 @@ if __name__ == '__main__':
     ex = MainWindow()
     ex.show()
     sys.exit(app.exec_())
-
