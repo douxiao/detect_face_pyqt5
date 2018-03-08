@@ -225,15 +225,19 @@ class MainWindow(QWidget):
         # 1.人脸检测
         # 2.关键点检测
         # 3.描述子提取
-        # 下面是为了获得一个字典重新排序，按时间顺序排序图片
-        self.time_flag = [20180308090126, 20180307195617, 20180307185225, 20180308091319, 20180307184108,
-                          20180307184333]  # 用于图片排序变量
+        time_flag = []  # 获取照片中时间
         file_glob = os.path.join(faces_folder_path, "*.jpg")
         file_list = []
         file_list.extend(glob.glob(file_glob))
-        cand_d = dict(zip(file_list, self.time_flag))
-        cand_sorted = sorted(cand_d.items(), key=lambda d: d[1])
-        print(cand_sorted[0][0])
+        print(file_list)
+        for i in range(0, len(file_list)):
+           tmp = str(file_list[i])
+           tmp_1 = tmp[51:65]  # 截取字符串,截取时间
+           time_flag.append(tmp_1)
+        #print(time_flag)
+        cand_d = dict(zip(file_list, time_flag))
+        cand_sorted = sorted(cand_d.items(), key=lambda d: d[1])  # 按字典的第二个关键字排序
+        #print(cand_sorted)
 
         for f in range(0, len(cand_sorted)):
 
@@ -267,7 +271,7 @@ class MainWindow(QWidget):
 
         # 候选人名单
 
-        self.candidate = ['dwh', 'whr', 'zjr', 'dx', 'dx', 'whr']
+        self.candidate = ['dwh', 'whr', 'zjr', 'dx', 'dx', 'whr', 'dx']
 
     def closeEvent(self, QCloseEvent):
 
