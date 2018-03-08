@@ -28,7 +28,6 @@ class MainWindow(QWidget):
         self.slot_init()  # 初始化信号槽
         self.dlib_para_init()
         self.btn_flag = 0  # 开关变量
-        self.local_data = []
 
     def set_ui(self):
         # 布局设置
@@ -48,7 +47,7 @@ class MainWindow(QWidget):
         self.label_move = QLabel()
         self.label_move.setFixedSize(100, 200)
 
-        self.label_show_camera.setFixedSize(641, 481)
+        self.label_show_camera.setFixedSize(800, 600)
         self.label_show_camera.setAutoFillBackground(False)
 
         # 布局
@@ -98,7 +97,7 @@ class MainWindow(QWidget):
         classifier = cv2.CascadeClassifier(harr_filepath)  # 加载人脸特征分类器
         if self.btn_flag == 0:
             ret, self.image = self.cap.read()
-            show = cv2.resize(self.image, (640, 480))
+            show = cv2.resize(self.image, (800, 600))
             show = cv2.cvtColor(show, cv2.COLOR_BGR2RGB)  # 这里指的是显示原图
             # opencv 读取图片的样式，不能通过Qlabel进行显示，需要转换为Qimage QImage(uchar * data, int width,
             # int height, Format format, QImageCleanupFunction cleanupFunction = 0, void *cleanupInfo = 0)
@@ -106,7 +105,7 @@ class MainWindow(QWidget):
             self.label_show_camera.setPixmap(QPixmap.fromImage(self.showImage))
         elif self.btn_flag == 1:  # 人脸检测
             ret_1, self.image_1 = self.cap.read()
-            show_0 = cv2.resize(self.image_1, (640, 480))
+            show_0 = cv2.resize(self.image_1, (800, 600))
             show_1 = cv2.cvtColor(show_0, cv2.COLOR_BGR2RGB)
             gray_image = cv2.cvtColor(show_0, cv2.COLOR_BGR2GRAY)
             faces = classifier.detectMultiScale(gray_image, 1.3, 5)  # 1.3和5是特征的最小、最大检测窗口，它改变检测结果也会改变
@@ -119,7 +118,7 @@ class MainWindow(QWidget):
         elif self.btn_flag == 2:  # 人脸识别
 
             ret_2, self.image_2 = self.cap.read()
-            show_2 = cv2.resize(self.image_2, (640, 480))
+            show_2 = cv2.resize(self.image_2, (800, 600))
             self.show_3 = cv2.cvtColor(show_2, cv2.COLOR_BGR2RGB)
             gray_image = cv2.cvtColor(show_2, cv2.COLOR_BGR2GRAY)
             self.dets = self.detector(gray_image, 1)  # 对视频中的人脸进行标定
@@ -188,23 +187,13 @@ class MainWindow(QWidget):
 
     def photo_face(self):
 
-        #   photo_save_path = '/home/dx/Desktop/detect_face_pyqt5/candidate-faces'
+        # photo_save_path = '/home/dx/Desktop/detect_face_pyqt5/candidate-faces'
 
         photo_save_path = os.path.join(os.path.dirname(os.path.abspath('__file__')),
                                        'candidate-faces/')
-        self.showImage.save(photo_save_path + datetime.now().strftime("%Y%m%d_%H%M%S") + ".jpg")
+        # self.time_flag.append(datetime.now().strftime("%Y%m%d%H%M%S"))
+        self.showImage.save(photo_save_path + datetime.now().strftime("%Y%m%d%H%M%S") + ".jpg")
 
-    def closeEvent(self, QCloseEvent):
-
-        reply = QMessageBox.question(self,u"Warning", "Are you sure quit ?", QMessageBox.Yes | QMessageBox.No,
-                                     QMessageBox.No)
-
-        if reply == QMessageBox.Yes:
-            self.cap.release()
-            self.timer_camera.stop()
-            QCloseEvent.accept()
-        else:
-            QCloseEvent.ignore()
 
     def dlib_para_init(self):
 
@@ -221,7 +210,7 @@ class MainWindow(QWidget):
         # 候选人文件夹
         #  faces_folder_path     = '/home/dx/Desktop/detect_face_pyqt5/candidate-faces'
         faces_folder_path = os.path.join(os.path.dirname(os.path.abspath('__file__')),
-                                         'candidate-faces')
+                                         'candidate-faces/')
         # 1.加载正脸检测器
         self.detector = dlib.get_frontal_face_detector()
         # 2.加载人脸关键点检测器
@@ -236,11 +225,20 @@ class MainWindow(QWidget):
         # 1.人脸检测
         # 2.关键点检测
         # 3.描述子提取
+        # 下面是为了获得一个字典重新排序，按时间顺序排序图片
+        self.time_flag = [20180308090126, 20180307195617, 20180307185225, 20180308091319, 20180307184108,
+                          20180307184333]  # 用于图片排序变量
+        file_glob = os.path.join(faces_folder_path, "*.jpg")
+        file_list = []
+        file_list.extend(glob.glob(file_glob))
+        cand_d = dict(zip(file_list, self.time_flag))
+        cand_sorted = sorted(cand_d.items(), key=lambda d: d[1])
+        print(cand_sorted[0][0])
 
-        for f in glob.glob(os.path.join(faces_folder_path, "*.jpg")):
+        for f in range(0, len(cand_sorted)):
 
-            print("Processing file: {}".format(f))
-            self.img = io.imread(f)
+            print("Processing file: {}".format(cand_sorted[f][0]))
+            self.img = io.imread(cand_sorted[f][0])
             # win.clear_overlay()
             # win.set_image(img)
 
@@ -269,7 +267,19 @@ class MainWindow(QWidget):
 
         # 候选人名单
 
-        self.candidate = ['dwh', 'whr', 'zjr', 'whr', 'dx', 'dx']
+        self.candidate = ['dwh', 'whr', 'zjr', 'dx', 'dx', 'whr']
+
+    def closeEvent(self, QCloseEvent):
+
+        reply = QMessageBox.question(self, u"Warning", "Are you sure quit ?", QMessageBox.Yes | QMessageBox.No,
+                                     QMessageBox.No)
+
+        if reply == QMessageBox.Yes:
+            self.cap.release()
+            self.timer_camera.stop()
+            QCloseEvent.accept()
+        else:
+            QCloseEvent.ignore()
 
 
 if __name__ == '__main__':
