@@ -28,6 +28,7 @@ class MainWindow(QWidget):
         self.slot_init()  # 初始化信号槽
         self.dlib_para_init()
         self.btn_flag = 0  # 开关变量
+        self.input_flag = 0
 
     def set_ui(self):
         # 布局设置
@@ -37,8 +38,10 @@ class MainWindow(QWidget):
         # 按钮设置
         self.btn_open_cam = QPushButton('打开相机')
         self.btn_photo = QPushButton('拍照')
+        self.btn_input_name = QPushButton('录入人名')
         self.btn_detection_face = QPushButton('人脸检测')
         self.btn_recognition_face = QPushButton('人脸识别')
+
 
         self.btn_quit = QPushButton('退出')
 
@@ -46,6 +49,8 @@ class MainWindow(QWidget):
         self.label_show_camera = QLabel()
         self.label_move = QLabel()
         self.label_move.setFixedSize(100, 200)
+        # 显示文本框
+        self.text = QTextEdit(self)
 
         self.label_show_camera.setFixedSize(800, 600)
         self.label_show_camera.setAutoFillBackground(False)
@@ -53,22 +58,25 @@ class MainWindow(QWidget):
         # 布局
         self.layout_button.addWidget(self.btn_open_cam)
         self.layout_button.addWidget(self.btn_photo)
+        self.layout_button.addWidget(self.btn_input_name)
         self.layout_button.addWidget(self.btn_detection_face)
         self.layout_button.addWidget(self.btn_recognition_face)
         self.layout_button.addWidget(self.btn_quit)
         self.layout_button.addWidget(self.label_move)
+        self.layout_button.addWidget(self.text)
 
         self.layout_main.addLayout(self.layout_button)
         self.layout_main.addWidget(self.label_show_camera)
 
         self.setLayout(self.layout_main)
         self.setGeometry(300, 300, 600, 400)
-        self.setWindowTitle("视频图像处理软件")
+        self.setWindowTitle("人脸识别软件")
 
     # 信号槽设置
     def slot_init(self):
         self.btn_open_cam.clicked.connect(self.btn_open_cam_click)
         self.btn_photo.clicked.connect(self.photo_face)
+        self.btn_input_name.clicked.connect(self.input_name)
         self.btn_detection_face.clicked.connect(self.detect_face)
         self.btn_recognition_face.clicked.connect(self.recognize_face)
         self.timer_camera.timeout.connect(self.show_camera)
@@ -116,7 +124,6 @@ class MainWindow(QWidget):
             self.label_show_camera.setPixmap(QPixmap.fromImage(detect_image))
 
         elif self.btn_flag == 2:  # 人脸识别
-
             ret_2, self.image_2 = self.cap.read()
             show_2 = cv2.resize(self.image_2, (800, 600))
             self.show_3 = cv2.cvtColor(show_2, cv2.COLOR_BGR2RGB)
@@ -153,7 +160,6 @@ class MainWindow(QWidget):
                 dist_ = np.linalg.norm(i - d_test)  # 计算欧式距离，有多少个候选人就有多少个距离,放到dist数组中。
                 self.dist.append(dist_)
                 # 候选人和距离组成一个dict字典
-            # print(self.dist)
             c_d = dict(zip(self.candidate, self.dist))
             for i in range(0, len(self.candidate)):  # 注意这里必须把dist[]之前的数据pop出去，才能确保每次不同线程计算的不同人的向量。
                 self.dist.pop()
@@ -193,6 +199,27 @@ class MainWindow(QWidget):
                                        'candidate-faces/')
         # self.time_flag.append(datetime.now().strftime("%Y%m%d%H%M%S"))
         self.showImage.save(photo_save_path + datetime.now().strftime("%Y%m%d%H%M%S") + ".jpg")
+        QMessageBox.information(self, "Information",
+                                self.tr("拍照成功!"))
+
+    def input_name(self):
+        name_path = os.path.join(os.path.dirname(os.path.abspath('__file__')),  # 将人名文件放在candidate-faces文件夹下
+                                 'candidate-faces/')
+        file_name_path = os.path.join(self.faces_folder_path, 'name.txt')
+        if self.input_flag == 0:
+            self.input_flag = 1
+            self.fname = QFileDialog.getOpenFileName(self, '打开文件', name_path, "Text Files(*.txt)")
+            if self.fname[0]:  # self.fname[0] 是/home/dx/Desktop/detect_face_pyqt5/candidate-faces/name.txt
+                with open(self.fname[0], 'r', encoding='gb18030', errors='ignore') as f:
+                    self.text.setText(f.read())
+            self.btn_input_name.setText('保存人名')
+        elif self.input_flag == 1:
+            self.input_flag = 0
+            self.cont = self.text.toPlainText()  # 获取文本框内容
+            f = open(file_name_path, 'w')
+            f.write(self.cont)
+            #print(self.cont)
+            self.btn_input_name.setText('录入人名')
 
 
     def dlib_para_init(self):
@@ -209,7 +236,7 @@ class MainWindow(QWidget):
 
         # 候选人文件夹
         #  faces_folder_path     = '/home/dx/Desktop/detect_face_pyqt5/candidate-faces'
-        faces_folder_path = os.path.join(os.path.dirname(os.path.abspath('__file__')),
+        self.faces_folder_path = os.path.join(os.path.dirname(os.path.abspath('__file__')),
                                          'candidate-faces/')
         # 1.加载正脸检测器
         self.detector = dlib.get_frontal_face_detector()
@@ -226,18 +253,18 @@ class MainWindow(QWidget):
         # 2.关键点检测
         # 3.描述子提取
         time_flag = []  # 获取照片中时间
-        file_glob = os.path.join(faces_folder_path, "*.jpg")
+        file_glob = os.path.join(self.faces_folder_path, "*.jpg")
         file_list = []
         file_list.extend(glob.glob(file_glob))
         print(file_list)
         for i in range(0, len(file_list)):
-           tmp = str(file_list[i])
-           tmp_1 = tmp[51:65]  # 截取字符串,截取时间
-           time_flag.append(tmp_1)
-        #print(time_flag)
+            tmp = str(file_list[i])
+            tmp_1 = tmp[51:65]  # 截取字符串,截取时间
+            time_flag.append(tmp_1)
+        # print(time_flag)
         cand_d = dict(zip(file_list, time_flag))
         cand_sorted = sorted(cand_d.items(), key=lambda d: d[1])  # 按字典的第二个关键字排序
-        #print(cand_sorted)
+        # print(cand_sorted)
 
         for f in range(0, len(cand_sorted)):
 
@@ -271,7 +298,16 @@ class MainWindow(QWidget):
 
         # 候选人名单
 
-        self.candidate = ['dwh', 'whr', 'zjr', 'dx', 'dx', 'whr', 'dx']
+       # self.candidate = ['dwh', 'whr', 'zjr', 'dx', 'dx', 'whr', 'dx']
+        self.candidate = self.readfile()  # 读取候选人,从name.txt中
+        print(self.candidate)
+
+    def readfile(self):
+        file_name_path = os.path.join(self.faces_folder_path, 'name.txt')
+        with open(file_name_path, 'r') as f:
+            content = f.read().splitlines()  # 去掉行尾的换行符\n 并保存为list
+            #content = [line.rstrip('\n') for line in f]
+            return content
 
     def closeEvent(self, QCloseEvent):
 
