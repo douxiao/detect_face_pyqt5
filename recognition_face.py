@@ -33,7 +33,7 @@ class MainWindow(QWidget):
     def set_ui(self):
         # 布局设置
         self.layout_main = QHBoxLayout()  # 整体框架是水平布局
-        self.layout_button = QVBoxLayout()
+        self.layout_button = QVBoxLayout()  # 按键布局是垂直布局
 
         # 按钮设置
         self.btn_open_cam = QPushButton('打开相机')
