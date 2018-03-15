@@ -42,7 +42,6 @@ class MainWindow(QWidget):
         self.btn_detection_face = QPushButton('人脸检测')
         self.btn_recognition_face = QPushButton('人脸识别')
 
-
         self.btn_quit = QPushButton('退出')
 
         # 显示视频
@@ -165,8 +164,13 @@ class MainWindow(QWidget):
                 self.dist.pop()
             # sorted将dict字典中数排序，按key顺序（第二个关键字）
             cd_sorted = sorted(c_d.items(), key=lambda d: d[1])
-            cv2.putText(self.show_3, cd_sorted[0][0], (x2, x1), cv2.FONT_HERSHEY_SIMPLEX, 1.0,
-                        (0, 255, 255), 2)
+            print(cd_sorted[0][1])
+            if cd_sorted[0][1] > 0.32:
+                cv2.putText(self.show_3, 'Unknown', (x2, x1), cv2.FONT_HERSHEY_SIMPLEX, 1.0,
+                            (0, 255, 255), 2)
+            else:
+                cv2.putText(self.show_3, cd_sorted[0][0], (x2, x1), cv2.FONT_HERSHEY_SIMPLEX, 1.0,
+                            (0, 255, 255), 2)
             # 各参数依次是：照片/添加的文字/左上角坐标/字体/字体大小/颜色/字体粗细
             print("\n The person is: ", cd_sorted[0][0])
             detect_image = QImage(self.show_3.data, self.show_3.shape[1], self.show_3.shape[0],
@@ -218,9 +222,8 @@ class MainWindow(QWidget):
             self.cont = self.text.toPlainText()  # 获取文本框内容
             f = open(file_name_path, 'w')
             f.write(self.cont)
-            #print(self.cont)
+            # print(self.cont)
             self.btn_input_name.setText('录入人名')
-
 
     def dlib_para_init(self):
 
@@ -237,7 +240,7 @@ class MainWindow(QWidget):
         # 候选人文件夹
         #  faces_folder_path     = '/home/dx/Desktop/detect_face_pyqt5/candidate-faces'
         self.faces_folder_path = os.path.join(os.path.dirname(os.path.abspath('__file__')),
-                                         'candidate-faces/')
+                                              'candidate-faces/')
         # 1.加载正脸检测器
         self.detector = dlib.get_frontal_face_detector()
         # 2.加载人脸关键点检测器
@@ -298,7 +301,7 @@ class MainWindow(QWidget):
 
         # 候选人名单
 
-       # self.candidate = ['dwh', 'whr', 'zjr', 'dx', 'dx', 'whr', 'dx']
+        # self.candidate = ['dwh', 'whr', 'zjr', 'dx', 'dx', 'whr', 'dx']
         self.candidate = self.readfile()  # 读取候选人,从name.txt中
         print(self.candidate)
 
@@ -306,7 +309,7 @@ class MainWindow(QWidget):
         file_name_path = os.path.join(self.faces_folder_path, 'name.txt')
         with open(file_name_path, 'r') as f:
             content = f.read().splitlines()  # 去掉行尾的换行符\n 并保存为list
-            #content = [line.rstrip('\n') for line in f]
+            # content = [line.rstrip('\n') for line in f]
             return content
 
     def closeEvent(self, QCloseEvent):
