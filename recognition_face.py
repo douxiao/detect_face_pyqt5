@@ -6,8 +6,8 @@
 # @Blog    : www.douxiao.org
 import sys
 import os
-import dlib
 import glob
+import dlib
 import cv2
 import numpy as np
 from PyQt5.QtWidgets import *
@@ -16,12 +16,13 @@ from PyQt5.QtGui import *
 from skimage import io
 from datetime import datetime
 import threading
-
+from HIK_camera_config.config import *
 
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
         self.timer_camera = QTimer()  # 需要定时器刷新摄像头界面
+        self.source = get_rtsp()  # 读取海康威视摄像头 rtsp地址
         self.cap = cv2.VideoCapture()
         self.cap_num = 0
         self.set_ui()  # 初始化UI界面
@@ -83,6 +84,7 @@ class MainWindow(QWidget):
 
     def btn_open_cam_click(self):
         if self.timer_camera.isActive() == False:
+            #flag = self.cap.open(self.source)  # 使用海康威视网络摄像头
             flag = self.cap.open(self.cap_num)
             if flag == False:
                 msg = QMessageBox.warning(self, u"Warning", u"请检测相机与电脑是否连接正确", buttons=QMessageBox.Ok,
@@ -111,6 +113,7 @@ class MainWindow(QWidget):
             self.showImage = QImage(show.data, show.shape[1], show.shape[0], QImage.Format_RGB888)
             self.label_show_camera.setPixmap(QPixmap.fromImage(self.showImage))
         elif self.btn_flag == 1:  # 人脸检测
+            # os.system('sh darknet.sh')
             ret_1, self.image_1 = self.cap.read()
             show_0 = cv2.resize(self.image_1, (800, 600))
             show_1 = cv2.cvtColor(show_0, cv2.COLOR_BGR2RGB)
@@ -124,17 +127,19 @@ class MainWindow(QWidget):
 
         elif self.btn_flag == 2:  # 人脸识别
             ret_2, self.image_2 = self.cap.read()
-            show_2 = cv2.resize(self.image_2, (800, 600))
-            self.show_3 = cv2.cvtColor(show_2, cv2.COLOR_BGR2RGB)
-            gray_image = cv2.cvtColor(show_2, cv2.COLOR_BGR2GRAY)
+            show_2 = cv2.resize(self.image_2, (480, 320))  # 把图像缩小为了人脸识别速度更快
+            show_4 = cv2.resize(self.image_2, (800, 600))
+            self.show_3 = cv2.cvtColor(show_2, cv2.COLOR_BGR2RGB)  # 用来后面的dlib 提取人脸
+            self.show_5 = cv2.cvtColor(show_4, cv2.COLOR_BGR2RGB)  # 为了显示原大小的图
+            gray_image = cv2.cvtColor(show_2, cv2.COLOR_BGR2GRAY)  # 将缩放的图转化成灰度图
             self.dets = self.detector(gray_image, 1)  # 对视频中的人脸进行标定
             self.dist = []  # 声明一个数组
             if not len(self.dets):
                 # print('Can`t get face.')
-                detect_image = QImage(self.show_3.data, self.show_3.shape[1], self.show_3.shape[0],
+                detect_image = QImage(self.show_5.data, self.show_5.shape[1], self.show_5.shape[0],
                                       QImage.Format_RGB888)
                 self.label_show_camera.setPixmap(QPixmap.fromImage(detect_image))
-            # 这里开启了一个人脸识别的线程，会自动为for循环分配线程，这里为进一步在同一个视频中，识别不同的人脸准备
+                # 这里开启了一个人脸识别的线程，会自动为for循环分配线程，这里为进一步在同一个视频中，识别不同的人脸准备
             t = threading.Thread(target=self.face_thread, name='Face_Thread')
             t.start()
             t.join()
@@ -152,7 +157,7 @@ class MainWindow(QWidget):
             y1 = face.bottom() if face.bottom() > 0 else 0
             x2 = face.left() if face.left() > 0 else 0
             y2 = face.right() if face.right() > 0 else 0
-            cv2.rectangle(self.show_3, (x2, x1), (y2, y1), (255, 0, 0), 3)
+            cv2.rectangle(self.show_3, (x2, x1), (y2, y1), (255, 0, 0), 1)
             # print(x2, x1, y2, y1)
             # 计算欧式距离
             for i in self.descriptors:  # 遍历之前提取的候选人的128D向量
@@ -165,7 +170,7 @@ class MainWindow(QWidget):
             # sorted将dict字典中数排序，按key顺序（第二个关键字）
             cd_sorted = sorted(c_d.items(), key=lambda d: d[1])
             print(cd_sorted[0][1])
-            if cd_sorted[0][1] > 0.32:
+            if cd_sorted[0][1] > 0.39:
                 cv2.putText(self.show_3, 'Unknown', (x2, x1), cv2.FONT_HERSHEY_SIMPLEX, 1.0,
                             (0, 255, 255), 2)
             else:
@@ -173,9 +178,10 @@ class MainWindow(QWidget):
                             (0, 255, 255), 2)
             # 各参数依次是：照片/添加的文字/左上角坐标/字体/字体大小/颜色/字体粗细
             print("\n The person is: ", cd_sorted[0][0])
-            detect_image = QImage(self.show_3.data, self.show_3.shape[1], self.show_3.shape[0],
+            show_4 = cv2.resize(self.show_3, (800, 600))  # 将原来的图恢复到之前图大小
+            detect_image = QImage(show_4.data, show_4.shape[1], show_4.shape[0],
                                   QImage.Format_RGB888)
-            self.label_show_camera.setPixmap(QPixmap.fromImage(detect_image))
+            self.label_show_camera.setPixmap(QPixmap.fromImage(detect_image))  # 将QImage显示在之前创建的QLabel控件
 
     def detect_face(self):
 
@@ -264,7 +270,7 @@ class MainWindow(QWidget):
             tmp = str(file_list[i])
             tmp_1 = tmp[51:65]  # 截取字符串,截取时间
             time_flag.append(tmp_1)
-        # print(time_flag)
+        #print(time_flag)
         cand_d = dict(zip(file_list, time_flag))
         cand_sorted = sorted(cand_d.items(), key=lambda d: d[1])  # 按字典的第二个关键字排序
         # print(cand_sorted)
